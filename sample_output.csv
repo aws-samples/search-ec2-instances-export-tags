@@ -1,0 +1,5 @@
+search_instance_id,search_public_ipv4,search_private_ipv4,Name,Autoscaled,devops:notes,environment,multiple-privateips,team
+i-0547c351bdfe85b9f,52.201.234.182,172.31.84.136,instance2,,delete_me,test,,devops
+i-0b6223b5914111a4b,,172.31.94.199,instance5,no,,,True,poc
+i-044f85cfc8c75a84e,3.93.237.146,172.31.85.33,instance1,,,development,,developers
+i-0b6223b5914111a4b,,172.31.94.199,instance5,no,,,True,poc
