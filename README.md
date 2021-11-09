@@ -14,20 +14,22 @@ Imagine you're working on a task and out of the blue, the security team send you
 
 1. Install and Setup virtualenv
 
-python3 -m pip install virtualenv
-python3 -m venv env
-source env/bin/activate
-
+  ```
+  python3 -m pip install virtualenv
+  python3 -m venv env
+  source env/bin/activate
+  ```
 2. Install packages:
-
-pip3 install -r requirements.txt
-
+  ```
+  pip3 install -r requirements.txt
+  ```
 3. Configure the AWS CLI:
-
-aws configure
-
+  ```
+  aws configure
+  ```
+  
 ### Script Usage
-
+```
 python search_instances.py -i instance_list -o out.csv -r us-east-1
 
 Example syntax: python search_instances.py -i INPUTFILE -o OUTPUTFILE -r REGION [-p PROFILE]
@@ -37,11 +39,13 @@ Parameters:
 2. -o/--outputfile (requied) - This is the output csv file
 3. -r/--region (required) - This is the region to search the instances.
 4. -p/--profile profile (optional) - This is the AWS CLI named profile to use. If not specified, the default configured credential will be used.
+```
 
 Examples:
+```
 1) python search_instances.py -i instance_list -o out.csv -r us-east-1
 2) python search_instances.py -i instance_list -o out.csv -r us-east-1 -p devprofile
-
+```
 
 ## Security
 
