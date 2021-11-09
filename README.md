@@ -1,5 +1,15 @@
 ## Search EC2 Instances and Export Tags to CSV
 
+Imagine you're working on a task and out of the blue, the security team send you a ticket with a list of instances with outdated software that needs to be updated.  You might be looking at a list of hundreds of instance ids or ip addresses and you'll be wondering what these instances are or who they belong to.  This project can help you answer that question.  This is a python script that takes in a list of instance-ids, private or public ipv4 addresses and searches for them in your AWS account.  For the ones it finds, it creates a CSV file that contains the combined tags of all the instances.  By looking at this CSV file, you should be able to better categorize these instances.
+
+### Input Example
+
+![Example Input](images/input.png?raw=true "Title")
+
+### Output Example
+
+![Example Input](images/output.png?raw=true "Title")
+
 ### Pre-requisites Installation
 
 1. Install and Setup virtualenv
