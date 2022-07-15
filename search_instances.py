@@ -4,7 +4,44 @@ import ipaddress
 import argparse
 import logging
 import sys
-from pathlib import Path
+
+# This class is essentially an array of dictionaries used to store instance metadata including tags.
+#
+class Table(object):
+    def __init__(self):
+        self._rows = []     # each row contains a dictionary of ec2 instance metadata
+        self._instance_id_map = {}  # for searching a row by instance id
+        self._private_ipv4_map = {} # for searching a row by private ipv4
+        self._public_ipv4_map = {}  # for searching a row by public ipv4
+
+    def add_row(self, row):
+        self._rows.append(row)
+        self._instance_id_map[row['search_instance_id']] = row
+        self._private_ipv4_map[row['search_private_ipv4']] = row
+        if 'search_public_ipv4' in row and row['search_public_ipv4']:
+            self._public_ipv4_map[row['search_public_ipv4']] = row
+
+    def get_rows(self):
+        return self._rows
+
+    def get_row_instance_id(self, instance_id):
+        return self._instance_id_map[instance_id]
+
+    def get_row_private_ipv4(self, ip_address):
+        return self._private_ipv4_map[ip_address]
+
+    def get_row_public_ipv4(self, ip_address):
+        return self._public_ipv4_map[ip_address]
+
+    def contains_instance_id(self, instance_id):
+        return True if instance_id in self._instance_id_map else False
+
+    def contains_private_ipv4(self, ip_address):
+        return True if ip_address in self._private_ipv4_map else False
+    
+    def contains_public_ipv4(self, ip_address):
+        return True if ip_address in self._public_ipv4_map else False
+
 
 # Setup basic logging to console
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -27,8 +64,8 @@ def parse_input_file(filename):
         ip_list.append(entry.strip()) if is_ipv4(entry.strip()) else instance_list.append(entry.strip())
     return ip_list, instance_list
 
-# Takes in boto3 tag dictionary and turns it into key=val format
-def map_format(tag_list):
+# Takes in boto3 tag dictionary and turns it into normal dictionary
+def dict_format(tag_list):
     tmp_dict = {}
     if not tag_list:
         return tmp_dict
@@ -61,62 +98,33 @@ if __name__ == "__main__":
     # Parse inputfile into two lists, one to store ips and other for instance-ids
     search_ip_list, search_instance_list = parse_input_file(inputfile)
 
-    # Create dictionaries to store info.  
-    # instance_id: tag
-    # private_ipv4: tag
-    # public_ipv4: tag
-    # instance_id: public_ipv4
-    # instance_id: private_ipv4
-    # private_ipv4: instance_id
-    # public_ipv4: instance_id
-    # private_ipv4: public_ipv4
-    # public_ipv4: private_ipv4
-    instance_ids_tags_dict = {}
-    private_ipv4_tags_dict = {}
-    public_ipv4_tags_dict = {}
-    instance_ids_private_ipv4s_dict = {}
-    instance_ids_public_ipv4s_dict = {}
-    private_ipv4s_instance_ids_dict = {}
-    public_ipv4s_instance_ids_dict = {}
-    private_ipv4_public_ipv4_dict = {}
-    public_ipv4_private_ipv4_dict = {}
+    # Create a table to store needed metadata of all ec2 instances in region
+    logging.info('Processing...')
+    all_instance_table = Table()
+    private_ipv4_list = []  
+    public_ipv4_list = []
     for instance in running_instances:
-        instance_ids_tags_dict[instance.id] = map_format(instance.tags)
-        private_ipv4_tags_dict[instance.private_ip_address] = map_format(instance.tags)
-        public_ipv4_tags_dict[instance.public_ip_address] = map_format(instance.tags)
-        instance_ids_private_ipv4s_dict[instance.id] = instance.private_ip_address
-        instance_ids_public_ipv4s_dict[instance.id] = instance.public_ip_address
-        private_ipv4s_instance_ids_dict[instance.private_ip_address] = instance.id
-        public_ipv4s_instance_ids_dict[instance.public_ip_address] = instance.id
-        private_ipv4_public_ipv4_dict[instance.private_ip_address] = instance.public_ip_address
-        public_ipv4_private_ipv4_dict[instance.public_ip_address] = instance.private_ip_address
+        info_dict = {'search_instance_id':instance.id, 'search_public_ipv4':instance.public_ip_address, 'search_private_ipv4':instance.private_ip_address}
+        info_dict.update(dict_format(instance.tags))
+        all_instance_table.add_row(info_dict)
+        private_ipv4_list.append(instance.private_ip_address)
+        public_ipv4_list.append(instance.public_ip_address)
 
-    # Search for instance-ids/ips from the input list and store their tags.  Also inject our own identifier tags into the found tags  
-    logging.info('Processing ec2 info...')
-    all_tags = []
+    # Create a table to store needed metadata of all ec2 instance that's being searched
+    search_table = Table()
     for instance_id in search_instance_list:
-        if instance_id in instance_ids_tags_dict:
-            instance_ids_tags_dict[instance_id]['search_instance_id'] = instance_id
-            instance_ids_tags_dict[instance_id]['search_private_ipv4'] = instance_ids_private_ipv4s_dict[instance_id] if instance_ids_private_ipv4s_dict[instance_id] else None
-            instance_ids_tags_dict[instance_id]['search_public_ipv4'] = instance_ids_public_ipv4s_dict[instance_id] if instance_ids_public_ipv4s_dict[instance_id] else None
-            all_tags.append(instance_ids_tags_dict[instance_id])
-    for ipv4 in search_ip_list:
-        if ipv4 in private_ipv4_tags_dict:    
-            private_ipv4_tags_dict[ipv4]['search_private_ipv4'] = ipv4
-            private_ipv4_tags_dict[ipv4]['search_instance_id'] = private_ipv4s_instance_ids_dict[ipv4] if private_ipv4s_instance_ids_dict[ipv4] else None
-            private_ipv4_tags_dict[ipv4]['search_public_ipv4'] = private_ipv4_public_ipv4_dict[ipv4] if private_ipv4_public_ipv4_dict[ipv4] else None
-            all_tags.append(private_ipv4_tags_dict[ipv4])
-        elif ipv4 in public_ipv4_tags_dict:    
-            public_ipv4_tags_dict[ipv4]['search_public_ipv4'] = ipv4
-            public_ipv4_tags_dict[ipv4]['search_instance_id'] = public_ipv4s_instance_ids_dict[ipv4] if public_ipv4s_instance_ids_dict[ipv4] else None
-            public_ipv4_tags_dict[ipv4]['search_private_ipv4'] = public_ipv4_private_ipv4_dict[ipv4] if public_ipv4_private_ipv4_dict[ipv4] else None
-            all_tags.append(public_ipv4_tags_dict[ipv4])
-    
-    # Create a list of distinct tag keys that exists between all the instances that are found in the input file.  
-    # Force certain attributes into the beginning columns.
+        if all_instance_table.contains_instance_id(instance_id):
+            search_table.add_row(all_instance_table.get_row_instance_id(instance_id))
+    for ip_address in search_ip_list:
+        if all_instance_table.contains_private_ipv4(ip_address):
+            search_table.add_row(all_instance_table.get_row_private_ipv4(ip_address))
+        elif all_instance_table.contains_public_ipv4(ip_address):
+            search_table.add_row(all_instance_table.get_row_public_ipv4(ip_address))
+
+    # Find unique tag key among all the instances that have been found.  These will be the columns.
     columns = []
-    for tag in all_tags:
-        for key,value in tag.items():
+    for row in search_table.get_rows():
+        for key,value in row.items():
             if key not in columns:
                 columns.append(key)
     columns.sort()
@@ -129,5 +137,5 @@ if __name__ == "__main__":
     with open(outputfile, 'w') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerow(columns)
-        for tag in all_tags:
-            writer.writerow([tag.get(column, None) for column in columns])
+        for row in search_table.get_rows():
+            writer.writerow([row.get(column, None) for column in columns])
